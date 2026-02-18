@@ -1,35 +1,10 @@
-<template>вапвапавпапа
+<template>
     <div v-show="isLoading" class="loading"> Загрузка...</div>
       <v-expansion-panels class="panel" v-model="panel">
         <v-expansion-panel>
           <v-expansion-panel-title>Фильтры</v-expansion-panel-title>
           <v-expansion-panel-text>
             <div class="filters">
-              <!-- Фильтр по мероприятиям (регулярные мероприятия) -->
-              <v-autocomplete
-                v-model="filters.selected.regularEvents"
-                :items="filters.value.regularEvents"
-                item-title="TITLE"
-                item-value="ID"
-                label="Мероприятие"
-                single-line
-                hide-details
-                variant="outlined"
-                multiple
-                chips
-                clearable
-              >
-                <template v-slot:prepend-item>
-                  <v-list-item>
-                    <v-list-item-content>
-                      <v-list-item-title>
-                        <v-checkbox label="Выбрать все мероприятия" v-model="filters.selectAll.regularEvents" @change="() => toggleSelectAll('regularEvents')" />
-                      </v-list-item-title>
-                    </v-list-item-content>
-                  </v-list-item>
-                </template>
-              </v-autocomplete>
-
               <!-- НОВЫЙ ФИЛЬТР: По пользователям (ответственным) -->
               <v-autocomplete
                 v-model="filters.selected.users"
@@ -60,33 +35,74 @@
                 </template>
               </v-autocomplete>
 
-              <!-- НОВЫЙ ФИЛЬТР: По промежутку дат передачи -->
-              <div class="date-range-filter">
+              <!-- Фильтр по мероприятиям (регулярные мероприятия) -->
+              <v-autocomplete
+                v-model="filters.selected.events"
+                :items="filters.value.events"
+                item-title="TITLE"
+                item-value="ID"
+                label="Мероприятие"
+                single-line
+                hide-details
+                variant="outlined"
+                multiple
+                chips
+                clearable
+              >
+                <template v-slot:prepend-item>
+                  <v-list-item>
+                    <v-list-item-content>
+                      <v-list-item-title>
+                        <v-checkbox label="Выбрать все мероприятия" v-model="filters.selectAll.regularEvents" @change="() => toggleSelectAll('regularEvents')" />
+                      </v-list-item-title>
+                    </v-list-item-content>
+                  </v-list-item>
+                </template>
+              </v-autocomplete>
+
+              <!-- НОВЫЙ ФИЛЬТР: По промежутку дат передачи (обновленный интерфейс) -->
+              <div class="date-range">
                 <v-text-field
-                  v-model="filters.dateRange.from"
-                  label="Дата передачи (с)"
-                  type="date"
-                  variant="outlined"
-                  hide-details
+                  v-model="dateRangeText"
+                  label="Выберите диапазон дат"
+                  prepend-inner-icon="mdi-calendar"
+                  readonly
                   single-line
-                ></v-text-field>
-                <v-text-field
-                  v-model="filters.dateRange.to"
-                  label="Дата передачи (по)"
-                  type="date"
-                  variant="outlined"
                   hide-details
-                  single-line
+                  variant="outlined"
+                  clearable
+                  @click="dialogCalendar = true"
+                  @click:clear="clearDateRange"
                 ></v-text-field>
-                <v-btn 
-                  v-if="filters.dateRange.from || filters.dateRange.to"
-                  icon
-                  small
-                  @click="clearDateRange"
-                  class="clear-date-btn"
-                >
-                  <v-icon>mdi-close</v-icon>
-                </v-btn>
+                
+                <v-dialog v-model="dialogCalendar" width="auto">
+                  <v-card>
+                    <v-card-title class="date-title">
+                      Выберите диапазон дат
+                      <v-btn icon @click="chancelDate" class="ml-auto">
+                        <v-icon>mdi-close</v-icon>
+                      </v-btn>
+                    </v-card-title>
+                    <v-row>
+                      <v-col cols="12" sm="6">
+                        <v-date-picker
+                          v-model="savedDate[0]"
+                          title="Минимальная дата"
+                        ></v-date-picker>
+                      </v-col>
+                      <v-col cols="12" sm="6">
+                        <v-date-picker
+                          v-model="savedDate[1]"
+                          title="Максимальная дата"
+                        ></v-date-picker>
+                      </v-col>
+                    </v-row>
+                    <v-card-actions>
+                      <v-spacer></v-spacer>
+                      <v-btn color="primary" @click="confirmDate">Готово</v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </v-dialog>
               </div>
             </div>
           </v-expansion-panel-text>
@@ -320,6 +336,35 @@ ChartJS.register(
   ArcElement, RadialLinearScale, PointElement, LineElement, Filler,
   ChartDataLabels // Добавляем плагин для подписей
 )
+
+// Новые переменные для выбора дат
+const dialogCalendar = ref(false);
+const savedDate = ref([]);
+
+// Вычисляемое поле для отображения выбранного диапазона дат
+const dateRangeText = computed(() => {
+  if (!filters.value.dateRange.from || !filters.value.dateRange.to) return '';
+  
+  const fromDate = new Date(filters.value.dateRange.from);
+  const toDate = new Date(filters.value.dateRange.to);
+  
+  const options = { year: 'numeric', month: '2-digit', day: '2-digit' };
+  return `${fromDate.toLocaleDateString('ru-RU', options)} - ${toDate.toLocaleDateString('ru-RU', options)}`;
+});
+
+// Новые функции для работы с датами
+function chancelDate() {
+  dialogCalendar.value = false;
+}
+
+function confirmDate() {
+  if (savedDate.value[0] && savedDate.value[1]) {
+    filters.value.dateRange.from = savedDate.value[0];
+    filters.value.dateRange.to = savedDate.value[1];
+  }
+  dialogCalendar.value = false;
+}
+
 const errorDisplay = ref('');
 const successDialog = ref(false);
 const errorDialog = ref(false);
@@ -579,6 +624,7 @@ function disableFilters(){
 function clearDateRange() {
   filters.value.dateRange.from = '';
   filters.value.dateRange.to = '';
+  savedDate.value = [];
 }
 
 function mergedData(data) {
@@ -852,7 +898,7 @@ const getAllDeals = async (filterEvents, filterStatuses, filterCompaines, filter
       let start = 0;
       const batchSize = 50; // Размер пачки для запроса
       let hasMore = true;
-
+console.log(filterEvents);
       // Формируем фильтры
       const localFilters = {
         "@UF_CRM_1742797326": filterEvents,
@@ -1349,8 +1395,6 @@ const horizontalBarOptions = {
 
 }
 
-
-// Опции для круговой диаграммы
 // Опции для круговой диаграммы
 const pieChartOptions = {
   responsive: true,
@@ -1499,15 +1543,21 @@ watch(() => allDealsData.value, (newDeals) => {
     gap: 1rem
     margin-bottom: 1rem
 
-  // НОВЫЙ СТИЛЬ: для фильтра по датам
-  .date-range-filter
-    display: grid
-    grid-template-columns: 1fr 1fr auto
-    gap: 0.5rem
+  // НОВЫЙ СТИЛЬ: для фильтра по датам (обновленный)
+  .date-range
+    grid-column: span 2
+    width: 100%
+    
+  .date-title
+    display: flex
+    justify-content: space-between
     align-items: center
+    width: 100%
+    padding: 0.5rem 1rem
 
-  .clear-date-btn
-    margin-top: 0.25rem
+  .v-dialog > .v-overlay__content > .v-card
+    padding: 1em
+    min-width: 700px
 
   .v-input.v-text-field
     display: block !important
